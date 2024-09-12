@@ -76,41 +76,28 @@ def add_shifted_columns(df, num_columns, name="close"):
 
 
 
-
-def split_data(features, labels, percent=80, validation_sets=False):
+def split_data(features, labels, percent=80):
     """
-    Splits features and labels into training, validation, and testing sets based on the specified percentage.
+    Splits features and labels into training and testing sets based on the specified percentage.
     
     Args:
         features (DataFrame): The input features.
         labels (Series): The target labels.
         percent (int, optional): Percentage of data to use for training. Defaults to 80.
-        validation_sets (bool, optional): If True, splits the data into training, validation, and testing sets. Defaults to False.
         
     Returns:
-        tuple: X_train, y_train, X_test, y_test, X_val, y_val (if validation_sets is True).
+        tuple: X_train, y_train, X_test, y_test.
     """
     # Splitting the data into features, labels, train and test sets
-    split_train = int(percent / 100 * len(features))
-    split_val = split_train + int((100 - percent) / 2 / 100 * len(features))
-
+    split = int(percent/100 * len(features))
+    
     X = features
     y = labels
+    
+    X_train = X.iloc[:split]
+    y_train = y.iloc[:split]
+    
+    X_test = X.iloc[split:]
+    y_test = y.iloc[split:]
 
-    X_train = X.iloc[:split_train]
-    y_train = y.iloc[:split_train]
-
-    if validation_sets:
-        X_val = X.iloc[split_train:split_val]
-        y_val = y.iloc[split_train:split_val]
-
-        X_test = X.iloc[split_val:]
-        y_test = y.iloc[split_val:]
-
-        return X_train, y_train, X_test, y_test, X_val, y_val
-    else:
-        X_test = X.iloc[split_train:]
-        y_test = y.iloc[split_train:]
-
-        return X_train, y_train, X_test, y_test
-
+    return X_train, y_train, X_test, y_test
