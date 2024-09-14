@@ -61,106 +61,35 @@ def plot_test_returns_cufflinks(returns, name=" "):
 
 
 
-def compute_model_accuracy_cufflinks(real_positions, predicted_positions, name=" "):
+def plot_test_returns(returns, legend=True, name=" "):
     """
-    Computes and displays the accuracy of predicted positions compared to real positions.
+    Plots the cumulative percentage returns from a trading strategy.
 
-    Parameters:
-    real_positions (list or array-like): The actual positions.
-    predicted_positions (list or array-like): The positions predicted by the model.
+    This function takes a series or dataframe of trading strategy returns, computes the cumulative sum,
+    and plots it as a percentage. The plot visualizes the profit and loss (P&L) over time.
+
+    Args:
+        returns_serie (pandas.Series): A series containing the returns from the trading strategy.
 
     Returns:
-    pd.DataFrame: A DataFrame containing the real positions, predicted positions, and accuracy (1 for correct, 0 for incorrect).
-    
-    Displays:
-    - Counts of correct and incorrect predictions.
-    - Histogram showing the distribution of accuracy values.
-    - Model accuracy percentage.
-    """
-
-    # Initialize Cufflinks in offline mode
-    cf.go_offline()
-
-    # Creating Dataframe with real positions and predicted positions
-    df_accuracy = pd.DataFrame(real_positions, columns=["real_position"])
-    df_accuracy["pred_position"] = predicted_positions
-    
-    # Assigning 1 if the position forecasted is equal to the real position and 0 otherwise
-    df_accuracy["accuracy"] = np.where(df_accuracy["real_position"] == df_accuracy["pred_position"], 1, 0)
-
-    # Count the occurrences of each unique accuracy value in the 'accuracy' column and store the result in 'accuracy'
-    accuracy = df_accuracy["accuracy"].value_counts()
-
-    # Printing explanation for the counts of 0 and 1 in the 'accuracy' column
-    print("Counts of 0 indicate instances where the predicted position did not match the real position.")
-    print("Counts of 1 indicate instances where the predicted position matched the real position.\n")
-    print(accuracy)
-
-    # Total counts of occurrences where the model was right (number assigned 1) divided by the total number of predictions
-    model_accuracy = accuracy[1] / len(df_accuracy)
-    print(f"\nModel has an accuracy of: {model_accuracy * 100:.2f}%")
-    
-    # Plotting the accuracy of the model in a histogram using the dynamic plot with Cufflinks
-    df_accuracy["accuracy"].iplot(
-        kind="hist",       
-        xTitle="Prediction Result", 
-        yTitle="Counts",
-        title=f"Model Accuracy {name}",
-        bargap=0.2,
-        theme="white",         
-        colors=["blue"],
-        #layout=dict(height=400)
-    )
-        
-    return df_accuracy.head()
-
-
-
-def compute_model_accuracy(real_positions, predicted_positions, name=" "):
-    """
-    Computes and displays the accuracy of predicted positions compared to real positions.
-
-    Parameters:
-    real_positions (list or array-like): The actual positions.
-    predicted_positions (list or array-like): The positions predicted by the model.
-
-    Returns:
-    pd.DataFrame: A DataFrame containing the real positions, predicted positions, and accuracy (1 for correct, 0 for incorrect).
-    
-    Displays:
-    - Counts of correct and incorrect predictions.
-    - Bar plot showing the distribution of accuracy values with a gap between bars.
-    - Model accuracy percentage.
+        None: The function generates and displays a plot.
     """
     
-    # Creating DataFrame with real positions and predicted positions
-    df_accuracy = pd.DataFrame({'real_position': real_positions})
-    df_accuracy["pred_position"] = predicted_positions
+    # Plot cumulative returns as a percentage
+    (np.cumsum(returns) * 100).plot(figsize=(15, 5), alpha=0.65)
     
-    # Assigning 1 if the position forecasted is equal to the real position and 0 otherwise
-    df_accuracy["accuracy"] = np.where(df_accuracy["real_position"] == df_accuracy["pred_position"], 1, 0)
+    # Draw a red horizontal line at y=0
+    plt.axhline(y=0, color='red', linestyle='-', linewidth=1)
+    
+    # Set labels and title
+    plt.xlabel('Time', fontsize=20)
+    plt.ylabel('P&L in %', fontsize=20)
+    plt.title(f'Cumulative Returns {name}', fontsize=20)
+    plt.legend().set_visible(legend)
+    print(f"Profits : {'%.2f' % (returns.cumsum().iloc[-1].sum() * 100)}%")
 
-    # Count the occurrences of each unique accuracy value in the 'accuracy' column
-    accuracy = df_accuracy["accuracy"].value_counts()
-
-    # Printing explanation for the counts of 0 and 1 in the 'accuracy' column
-    print("Counts of 0 indicate instances where the predicted position did not match the real position.")
-    print("Counts of 1 indicate instances where the predicted position matched the real position.\n")
-    print(accuracy)
-
-    # Total counts of occurrences where model was right (number assigned 1) divided into the total number of predictions
-    model_accuracy = accuracy[1] / len(df_accuracy)
-    print(f"\nModel has an accuracy of: {model_accuracy * 100:.2f}%")
-
-    # Create a bar plot with a gap between bars
-    plt.bar(accuracy.index, accuracy.values, width=0.8)  # width adjusted for bar gap
-    plt.xticks([0, 1], labels=['Incorrect = 0', 'Correct = 1'])
-    plt.title("Model Accuracy", fontsize=20)
-    plt.ylabel("Counts", fontsize=15)
-    plt.xlabel(f"Prediction Result {name}", fontsize=15)
+    # Display the plot
     plt.show()
-
-    return df_accuracy.head()
 
 
 

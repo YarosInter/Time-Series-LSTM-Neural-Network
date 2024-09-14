@@ -8,6 +8,10 @@ import cufflinks as cf
 import plotly.offline as pyo
 from plotly.subplots import make_subplots
 import plotly.graph_objs as go
+import tensorflow as tf
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
+import os
+from tensorflow.keras.layers import Dropout
 
 
 
@@ -41,6 +45,109 @@ def compute_strategy_returns(y_test, y_pred):
     df["returns"] = df["pct_change"] * df["pred_position"]
 
     return df
+
+
+
+def compute_model_accuracy_cufflinks(real_positions, predicted_positions, name=" "):
+    """
+    Computes and displays the accuracy of predicted positions compared to real positions.
+
+    Parameters:
+    real_positions (list or array-like): The actual positions.
+    predicted_positions (list or array-like): The positions predicted by the model.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the real positions, predicted positions, and accuracy (1 for correct, 0 for incorrect).
+    
+    Displays:
+    - Counts of correct and incorrect predictions.
+    - Histogram showing the distribution of accuracy values.
+    - Model accuracy percentage.
+    """
+
+    # Initialize Cufflinks in offline mode
+    cf.go_offline()
+
+    # Creating Dataframe with real positions and predicted positions
+    df_accuracy = pd.DataFrame(real_positions, columns=["real_position"])
+    df_accuracy["pred_position"] = predicted_positions
+    
+    # Assigning 1 if the position forecasted is equal to the real position and 0 otherwise
+    df_accuracy["accuracy"] = np.where(df_accuracy["real_position"] == df_accuracy["pred_position"], 1, 0)
+
+    # Count the occurrences of each unique accuracy value in the 'accuracy' column and store the result in 'accuracy'
+    accuracy = df_accuracy["accuracy"].value_counts()
+
+    # Printing explanation for the counts of 0 and 1 in the 'accuracy' column
+    print("Counts of 0 indicate instances where the predicted position did not match the real position.")
+    print("Counts of 1 indicate instances where the predicted position matched the real position.\n")
+    print(accuracy)
+
+    # Total counts of occurrences where the model was right (number assigned 1) divided by the total number of predictions
+    model_accuracy = accuracy[1] / len(df_accuracy)
+    print(f"\nModel has an accuracy of: {model_accuracy * 100:.2f}%")
+    
+    # Plotting the accuracy of the model in a histogram using the dynamic plot with Cufflinks
+    df_accuracy["accuracy"].iplot(
+        kind="hist",       
+        xTitle="Prediction Result", 
+        yTitle="Counts",
+        title=f"Model Accuracy {name}",
+        bargap=0.2,
+        theme="white",         
+        colors=["blue"],
+        #layout=dict(height=400)
+    )
+        
+    return df_accuracy.head()
+
+
+
+def compute_model_accuracy(real_positions, predicted_positions, name=" "):
+    """
+    Computes and displays the accuracy of predicted positions compared to real positions.
+
+    Parameters:
+    real_positions (list or array-like): The actual positions.
+    predicted_positions (list or array-like): The positions predicted by the model.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the real positions, predicted positions, and accuracy (1 for correct, 0 for incorrect).
+    
+    Displays:
+    - Counts of correct and incorrect predictions.
+    - Bar plot showing the distribution of accuracy values with a gap between bars.
+    - Model accuracy percentage.
+    """
+    
+    # Creating DataFrame with real positions and predicted positions
+    df_accuracy = pd.DataFrame({'real_position': real_positions})
+    df_accuracy["pred_position"] = predicted_positions
+    
+    # Assigning 1 if the position forecasted is equal to the real position and 0 otherwise
+    df_accuracy["accuracy"] = np.where(df_accuracy["real_position"] == df_accuracy["pred_position"], 1, 0)
+
+    # Count the occurrences of each unique accuracy value in the 'accuracy' column
+    accuracy = df_accuracy["accuracy"].value_counts()
+
+    # Printing explanation for the counts of 0 and 1 in the 'accuracy' column
+    print("Counts of 0 indicate instances where the predicted position did not match the real position.")
+    print("Counts of 1 indicate instances where the predicted position matched the real position.\n")
+    print(accuracy)
+
+    # Total counts of occurrences where model was right (number assigned 1) divided into the total number of predictions
+    model_accuracy = accuracy[1] / len(df_accuracy)
+    print(f"\nModel has an accuracy of: {model_accuracy * 100:.2f}%")
+
+    # Create a bar plot with a gap between bars
+    plt.bar(accuracy.index, accuracy.values, width=0.8)  # width adjusted for bar gap
+    plt.xticks([0, 1], labels=['Incorrect = 0', 'Correct = 1'])
+    plt.title("Model Accuracy", fontsize=20)
+    plt.ylabel("Counts", fontsize=15)
+    plt.xlabel(f"Prediction Result {name}", fontsize=15)
+    plt.show()
+
+    return df_accuracy.head()
 
     
 
@@ -195,7 +302,7 @@ def create_model_checkpoint(model_name, save_path="model_experiments"):
     )
 
 
-def run_dnn(p_model_name, layers=3, p_epochs=50, lr=0.001, ptn=5):
+def run_dnn(train_sets, val_sets, p_model_name, layers=3, p_epochs=30, lr=0.001, ptn=5):
     """
     Builds, compiles, and trains a deep neural network (DNN) model with specified parameters.
 
@@ -217,11 +324,16 @@ def run_dnn(p_model_name, layers=3, p_epochs=50, lr=0.001, ptn=5):
         - Validation data is used during training to monitor performance on unseen data.
     """
     
+    for features, labels in train_sets.take(1):
+        features_input_shape = features.shape[1:]
+        break
+    
+   
     hidden_layers = layers 
     p_model_name = Sequential(name=p_model_name)
 
     # Input layer
-    p_model_name.add(Dense(64, input_shape=(X_train_scaled.shape[1],), name="input_layer"))
+    p_model_name.add(Dense(64, input_shape=(features_input_shape), name="input_layer_0"))
 
     # hidden layers
     for i in range(0, hidden_layers):
@@ -231,19 +343,23 @@ def run_dnn(p_model_name, layers=3, p_epochs=50, lr=0.001, ptn=5):
     # Output layer
     p_model_name.add(Dense(1, activation="linear", name="output_layer"))
     
-    checkpoint_callback = create_model_checkpoint(p_model_name.name)
+    backtest.checkpoint_callback = create_model_checkpoint(p_model_name.name)
     early_stopping = EarlyStopping(monitor="val_loss", patience=ptn, verbose=1)
+    reduce_plateau = ReduceLROnPlateau(monitor="val_loss", factor=0.1, patience=25, verbose=1)
 
     # Compiling the model
     p_model_name.compile(loss="mae", optimizer=Adam(learning_rate=lr), metrics=["mae","mse"])
 
     # Training the model
-    history = p_model_name.fit(X_train_scaled, np.sign(y_train), 
-                                   validation_data=(X_val_scaled, np.sign(y_val)), 
-                                   batch_size=128, 
-                                   epochs=p_epochs,
-                                   verbose=0,
-                                   callbacks=[checkpoint_callback, early_stopping]
-                                  )
+    history = p_model_name.fit(train_sets,
+                               validation_data=(val_sets), 
+                               batch_size=512, 
+                               epochs=p_epochs,
+                               verbose=0,
+                               callbacks=[checkpoint_callback, early_stopping]
+                              )
 
     return history
+
+
+

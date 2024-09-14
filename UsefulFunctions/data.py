@@ -101,3 +101,48 @@ def split_data(features, labels, percent=80):
     y_test = y.iloc[split:]
 
     return X_train, y_train, X_test, y_test
+
+
+
+def create_3d_data(X_data, y_data, lag):
+    """
+    Transforms 2D input data into 3D format suitable for training recurrent neural networks (e.g., LSTM).
+
+    This function converts time series data from 2D to 3D by creating overlapping sequences 
+    of a specified lag. Each new data point in the output will contain 'lag' number of past timesteps 
+    as features and the corresponding current timestep as the target.
+
+    Parameters:
+    ----------
+    X_data : np.array or list
+        The input feature data in 2D format, where each row is a timestep.
+    
+    y_data : np.array or list
+        The target values corresponding to the input data, where each element is a label for the respective timestep.
+    
+    lag : int
+        The number of past timesteps (sequence length) to include in each 3D sample.
+
+    Returns:
+    -------
+    X_data_3d : np.array
+        The transformed 3D array of input data, where each element is a sequence of 'lag' timesteps.
+    
+    y_data_3d : np.array
+        The corresponding target values, shifted based on the 'lag' parameter.
+    """
+    X_data_3d = []
+    y_data_3d = []
+
+    for i in range(lag, len(X_data)):
+        X_data_3d.append(X_data[i-lag:i])
+        y_data_3d.append(y_data[i])
+
+    X_data_3d = np.array(X_data_3d)
+    y_data_3d = np.array(y_data_3d)
+
+    return X_data_3d, y_data_3d
+
+
+
+
